@@ -1,6 +1,6 @@
 ;;; mew-absfilter.el --- spam filter with bsfilter for Mew
 
-;; Author: SAITO Takuya <reed@lily.freemail.ne.jp>
+;; Author: SAITO Takuya <tabmore@gmail.com>
 ;; $Id$
 
 ;; You can use, copy, distribute, and/or modify this file for any purpose.
@@ -23,8 +23,12 @@
 ;; even in nntp.
 
 ;;; History:
-;;  v1.38, 11 Jun 2006
+;;  v1.38, 2006-06-11
 ;;   Masayuki Ataka <masayuki.ataka@gmail.com> Support Mew 5
+;;  v1.39, 2007-01-17
+;;   Masayuki Ataka <masayuki.ataka@gmail.com> Support non-nil mew-use-suffix
+;;  v1.40, 2007-01-28
+;;   SAITO Takuya <tabmore@gmail.com> tiny fix
 
 ;;; Code:
 
@@ -122,9 +126,21 @@ Use `mew-expand-folder' iff `mew-expand-msg' is not available."
       `(mew-expand-msg ,folder ,msg)
     `(mew-expand-folder ,folder ,msg)))
 
+(defmacro mew-absfilter-sumsyn-filename ()
+  "Get filename"
+  (if (fboundp 'mew-msg-get-filename)
+      `(mew-msg-get-filename (mew-sumsyn-message-number))
+    `(mew-sumsyn-message-number)))
+
+(defun mew-absfilter-match-string-message-number ()
+  (if (and (boundp 'mew-use-suffix)
+	   (boundp 'mew-suffix))
+      (mew-match-string 1)
+    (mew-match-string 0)))
+
 ;; spam check
 (defun mew-absfilter-collect-message-region (begin end)
-  "Returns a list of message number in region."
+  "Returns a list of message file name in region."
   (let (msgs)
     (save-excursion
       (save-restriction
@@ -133,7 +149,7 @@ Use `mew-expand-folder' iff `mew-expand-msg' is not available."
 	(while (not (eobp))
 	  (when (and (mew-summary-markable)
 		     (mew-sumsyn-match mew-regex-sumsyn-short))
-	    (push (mew-sumsyn-message-number) msgs))
+	    (push (mew-absfilter-sumsyn-filename) msgs))
 	  (forward-line))))
     (nreverse msgs)))
 
@@ -143,7 +159,7 @@ Use `mew-expand-folder' iff `mew-expand-msg' is not available."
       (goto-char (point-min))
       (while (not (eobp))
 	(when (looking-at mew-regex-message-files2)
-	  (push (mew-match-string 0) spam))
+	  (push (mew-absfilter-match-string-message-number) spam))
 	(forward-line)))
     (nreverse spam)))
 
