@@ -234,7 +234,7 @@
   "Check spam messages with bsfilter."
   (interactive "P")
   (mew-pickable
-   (let ((region (if arg
+   (let ((region (if (or arg (mew-mark-active-p))
 		     (mew-summary-get-region)
 		   (cons (point-min) (point-max)))))
      (mew-bsfilter-check-spam-region (mew-summary-folder-name)
