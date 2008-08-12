@@ -74,9 +74,7 @@
 
 ;;; bsfilter
 (defvar mew-absfilter-program "bsfilter")
-(defvar mew-absfilter-arg-check '("--quiet" "--list-spam"
-				  ;; "--asynchronous-auto-update"
-				  ))
+(defvar mew-absfilter-arg-check '("--quiet" "--list-spam"))
 (defvar mew-absfilter-arg-clean '("--sub-spam" "--add-clean" "--update"))
 (defvar mew-absfilter-arg-spam '("--sub-clean" "--add-spam" "--update"))
 
