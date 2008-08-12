@@ -248,12 +248,13 @@
   "Check spam messages with bsfilter after retrieve."
   ;; bnm and directive is local variable which can be used in
   ;; mew-{local,pop,imap,nntp}-sentinel.
-  (let* ((proto (mew-folder-prefix (mew-case:folder-folder bnm)))
-	 (check (cdr (assoc proto mew-bsfilter-check-directive-list))))
-    (when (memq directive check)
-      (mew-bsfilter-check-spam-region bnm
-				      (mew-sinfo-get-start-point)
-				      (point-max)))))
+  (when (stringp bnm)
+    (let* ((proto (mew-folder-prefix (mew-case:folder-folder bnm)))
+	   (check (cdr (assoc proto mew-bsfilter-check-directive-list))))
+      (when (memq directive check)
+	(mew-bsfilter-check-spam-region bnm
+					(mew-sinfo-get-start-point)
+					(point-max))))))
 
 (add-hook 'mew-pop-sentinel-non-biff-hook
 	  'mew-bsfilter-check-spam-after-retrieve)
