@@ -6,9 +6,6 @@
 ;; You can use, copy, distribute, and/or modify this file for any purpose.
 ;; There is NO WARRANTY.
 
-;;; ChangeLog:
-;;  1.38 Masayuki Ataka <masayuki.ataka@gmail.com> for Mew 5
-
 ;;; Commentary:
 
 ;; You can find bsfilter at http://bsfilter.org/
@@ -24,6 +21,10 @@
 
 ;; With "bx" (mew-absfilter-summary-exec-spam), you can process spam mark
 ;; even in nntp.
+
+;;; History:
+;;  v1.38, 11 Jun 2006
+;;   Masayuki Ataka <masayuki.ataka@gmail.com> Support Mew 5
 
 ;;; Code:
 
@@ -112,6 +113,14 @@
   (apply 'call-process
 	 mew-absfilter-program nil 0 nil
 	 (append mew-absfilter-arg-spam files)))
+
+(defmacro mew-absfilter-expand-msg (folder msg)
+  "Expand message MSG in FOLDER.
+Function `mew-expand-msg' is defined after Mew 4.2.53.
+Use `mew-expand-folder' iff `mew-expand-msg' is not available."
+  (if (fboundp 'mew-expand-msg)
+      `(mew-expand-msg ,folder ,msg)
+    `(mew-expand-folder ,folder ,msg)))
 
 ;; spam check
 (defun mew-absfilter-collect-message-region (begin end)
@@ -247,14 +256,6 @@
        (unless mark-only
 	 (mew-absfilter-add-spam (list file))
 	 (message "Learned as spam"))))))
-
-(defun mew-absfilter-expand-msg (folder msg)
-  "Expand message MSG in FOLDER.
-Function `mew-expand-msg' is defined after Mew 4.2.53.
-Use `mew-expand-folder' iff `mew-expand-msg' is not available."
-  (if (fboundp 'mew-expand-msg)
-      (mew-expand-msg folder msg)
-    (mew-expand-folder folder msg)))
 
 (defun mew-absfilter-mark-learn-clean (&optional mark-only)
   "Learn all messages marked with '*' as clean (not spam)."
