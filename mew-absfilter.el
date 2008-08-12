@@ -80,7 +80,7 @@
       (apply 'call-process
 	     mew-bsfilter-program nil wait nil
 	     (append mew-bsfilter-arg-spam (list path)))
-      (mew-bsfilter-do-action (mew-bsfilter-folder-action fld)))
+      (mew-bsfilter-do-action (mew-bsfilter-folder-action fld) t))
     (unless no-msg
       (message "Marked as spam"))))
 
@@ -140,12 +140,12 @@
 	;;xxx default
 	mew-mark-review)))
 
-(defun mew-bsfilter-do-action (action)
+(defun mew-bsfilter-do-action (action &optional msg)
   (cond
    ((listp action)
-    (mew-summary-refile-body action t t))
+    (mew-summary-refile-body action t (not msg)))
    ((integerp action)
-    (mew-mark-put-mark action t))))
+    (mew-mark-put-mark action (not msg)))))
 
 (defun mew-bsfilter-undo-action (action)
   (when (mew-sumsyn-match mew-regex-sumsyn-short)
