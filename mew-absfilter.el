@@ -145,7 +145,7 @@
      (let ((msgs (mew-absfilter-collect-message-region begin end))
 	   nxt)
        (when msgs
-	 (message "Spam checking..."))
+	 (message "Spam checking %s..." case:folder))
        (while msgs
 	 (let ((buf (get-buffer-create
 		     (generate-new-buffer-name " *mew bsfilter*")))
@@ -208,12 +208,13 @@
      (with-current-buffer case:folder
        (setq mew-absfilter-summary-buffer-process
 	     (delq process mew-absfilter-summary-buffer-process)))
-     (message "Spam checking...%s"
+     (message "Spam checking %s...%s"
+	      case:folder
 	      (cond
 	       ((= status 0)
-		(format "done (%d spam in %s)" (length spam) case:folder))
+		(format "done (%d spam)" (length spam)))
 	       ((= status 1)
-		(concat "done (spam not found in " case:folder ")"))
+		(concat "done (spam not found)"))
 	       (t
 		(concat "failed. " event))))
      (kill-buffer (current-buffer)))))
