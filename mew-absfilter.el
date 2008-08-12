@@ -188,24 +188,35 @@
 			     (append mew-bsfilter-arg-check msglist)))
 	(set-process-sentinel process 'mew-bsfilter-sentinel)
 	(add-to-list 'mew-summary-buffer-bsfilter-process process))
-      (setq msglist nxt))))
+      (setq msglist nxt)))
+  (when mew-summary-buffer-bsfilter-process
+    (force-mode-line-update)))
 
 (defun mew-bsfilter-apply-spam-action (case:folder spam)
-  (let* ((vfolder (mew-folder-to-thread case:folder))
-	 (buf (if (and (get-buffer vfolder)
-		       (mew-virtual-thread-p vfolder)
-		       (mew-thread-cache-valid-p vfolder))
-		  vfolder
-		case:folder))
-	 action)
-    (when (get-buffer buf)
-      (set-buffer buf)
-      (setq action (mew-bsfilter-folder-action case:folder))
-      (save-excursion
-	(dolist (msg spam)
-	  (goto-char (point-min))
-	  (when (re-search-forward (mew-regex-sumsyn-msg msg) nil t)
-	    (mew-bsfilter-do-action action)))))))
+  (let ((vfolder (mew-folder-to-thread case:folder))
+	(action (mew-bsfilter-folder-action case:folder)))
+    (save-excursion
+      (when (and spam
+		 (get-buffer vfolder)
+		 (mew-virtual-thread-p vfolder)
+		 (mew-thread-cache-valid-p vfolder))
+	(let ((msgs spam))
+	  (setq spam nil)
+	  (set-buffer vfolder)
+	  (save-excursion
+	    (dolist (msg msgs)
+	      (goto-char (point-min))
+	      (if (re-search-forward (mew-regex-sumsyn-msg msg) nil t)
+		  (mew-bsfilter-do-action action)
+		(push msg spam))))))
+      (when (and spam
+		 (get-buffer case:folder))
+	(set-buffer case:folder)
+	(save-excursion
+	  (dolist (msg spam)
+	    (goto-char (point-min))
+	    (when (re-search-forward (mew-regex-sumsyn-msg msg) nil t)
+	      (mew-bsfilter-do-action action))))))))
 
 (defun mew-bsfilter-collect-spam-message ()
   (save-excursion
