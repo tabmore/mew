@@ -138,7 +138,7 @@
   (mew-summary-multi-msgs
    (message "Marking as clean...")
    (mew-bsfilter-add-clean FILES)
-   (mew-mark-undo-mark mew-mark-multi)
+   (mew-mark-undo-mark mew-mark-review)
    (message "Marking as clean...done")))
 
 (defun mew-bsfilter-learn-spam-multi ()
@@ -146,7 +146,7 @@
   (mew-summary-multi-msgs
    (message "Marking as spam...")
    (mew-bsfilter-add-spam FILES)
-   (mew-mark-undo-mark mew-mark-multi)
+   (mew-mark-undo-mark mew-mark-review)
    (message "Marking as spam...done")))
 
 ;; check
