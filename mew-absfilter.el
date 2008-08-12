@@ -154,12 +154,10 @@
   "This function returns a list of message number."
   (mew-summary-or-thread
    (save-excursion
-     (let ((regex "^[ U]")		;xxx (mew-mark-regex ?U ? ) is ideal ?
-;;	   (regex (mew-mark-regex ? ))
-	   (msglist nil))
-       (goto-char begin)
-       (while (re-search-forward regex end t)
-	 (when (mew-sumsyn-match mew-regex-sumsyn-short)
+     (let ((msglist nil))
+       (while (< (point) end)
+	 (when (and (mew-summary-markable)
+		    (mew-sumsyn-match mew-regex-sumsyn-short))
 	   (setq msglist (cons (mew-sumsyn-message-number) msglist)))
 	 (forward-line))
        (nreverse msglist)))))
