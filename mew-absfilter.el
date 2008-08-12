@@ -38,6 +38,21 @@
 (define-key mew-summary-mode-map "b" mew-bsfilter-map)
 
 
+;; Use buffer-local-variable in process-buffer.
+;; process-{put,get} is avairable only in Emacs-21.4 or above.
+(defvar mew-bsfilter-process-folder nil)
+(make-variable-buffer-local 'mew-bsfilter-process-folder)
+
+;; modeline
+(defvar mew-summary-buffer-bsfilter-process nil)
+(defvar mew-summary-buffer-bsfilter-process-status " bsfilter")
+
+(defadvice mew-summary-setup-mode-line (after bsfilter-process activate)
+  (let ((bsfilter (list 'mew-summary-buffer-bsfilter-process
+			'mew-summary-buffer-bsfilter-process-status)))
+    (unless (assq bsfilter mode-line-process)
+      (setq mode-line-process (cons bsfilter mode-line-process)))))
+
 (defun mew-bsfilter-folder-action (folder)
   (let ((action (catch 'found
 		  (dolist (act mew-bsfilter-spam-action)
@@ -270,21 +285,6 @@
 
 (add-hook 'mew-shimbun-retrieve-hook
 	  'mew-bsfilter-check-spam-after-shimbun-retrieve)
-
-;; Use buffer-local-variable in process-buffer.
-;; process-{put,get} is avairable only in Emacs-21.4 or above.
-(defvar mew-bsfilter-process-folder nil)
-(make-variable-buffer-local 'mew-bsfilter-process-folder)
-
-;; modeline
-(defvar mew-summary-buffer-bsfilter-process nil)
-(defvar mew-summary-buffer-bsfilter-process-status " bsfilter")
-
-(defadvice mew-summary-setup-mode-line (after bsfilter-process activate)
-  (let ((bsfilter (list 'mew-summary-buffer-bsfilter-process
-			'mew-summary-buffer-bsfilter-process-status)))
-    (unless (assq bsfilter mode-line-process)
-      (setq mode-line-process (cons bsfilter mode-line-process)))))
 
 (provide 'mew-bsfilter)
 
