@@ -153,16 +153,18 @@
 ;; check
 (defun mew-bsfilter-collect-message-region (begin end)
   "This function returns a list of message number."
-  (mew-pickable
-   (save-excursion
-     (let ((msglist nil))
-       (goto-char begin)
-       (while (< (point) end)
-	 (when (and (mew-summary-markable)
-		    (mew-sumsyn-match mew-regex-sumsyn-short))
-	   (setq msglist (cons (mew-sumsyn-message-number) msglist)))
-	 (forward-line))
-       (nreverse msglist)))))
+  (let ((msglist nil))
+    (mew-pickable
+     (save-excursion
+       (save-restriction
+	 (narrow-to-region begin end)
+	 (goto-char (point-min))
+	 (while (not (eobp))
+	   (when (and (mew-summary-markable)
+		      (mew-sumsyn-match mew-regex-sumsyn-short))
+	     (setq msglist (cons (mew-sumsyn-message-number) msglist)))
+	   (forward-line)))))
+    (nreverse msglist)))
 
 (defun mew-bsfilter-check-spam-region (case:folder begin end)
   (let ((msglist (with-current-buffer case:folder
