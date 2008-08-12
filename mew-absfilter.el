@@ -376,6 +376,26 @@ Advised in mew-absfilter.el"
 (add-hook 'mew-shimbun-retrieve-hook
 	  'mew-absfilter-check-spam-after-shimbun-retrieve)
 
+
+;; inhibit pack
+(defadvice mew-summary-pack (around absfilter-inhibit activate)
+  "Inhibit pack during spam checking.
+Advised in mew-absfilter.el"
+  (let ((procs mew-absfilter-summary-process)
+	running buf)
+    (while (and (not running)
+		procs)
+      (setq buf (process-buffer (car procs))
+	    procs (cdr procs))
+      (when (and (buffer-live-p buf)
+		 (eq (with-current-buffer buf
+		       (get-buffer mew-absfilter-process-folder))
+		     (current-buffer)))
+	(setq running t)))
+    (if running
+	(message "bsfilter is running. Try later")
+      ad-do-it)))
+
 
 (provide 'mew-absfilter)
 
