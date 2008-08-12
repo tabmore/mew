@@ -324,7 +324,7 @@ Save `mew-absfilter-spam-folder-max-msgs' messages."
 
 ;; biff scan inc sync exec get list jobs
 (defvar mew-absfilter-check-directive-list '(("+" inc)
-					     ("$" nil)
+					     ("$" . nil)
 					     ("%" inc scan)
 					     ("-" scan)))
 
