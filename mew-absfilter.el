@@ -48,6 +48,7 @@
   :group 'mew-highlight)
 
 (defun mew-absfilter-mark-kill-spam (src msg)
+  "Return t if kill summary line."
   (not (string= src mew-absfilter-spam-folder)))
 
 (defun mew-absfilter-mark-exec-spam (src msgs)
@@ -80,7 +81,7 @@
 
 (defvar mew-absfilter-spam-folder-max-msgs 3000)
 
-;; mew-prog-grep-max-msgs
+;; like mew-prog-grep-max-msgs
 (defvar mew-absfilter-max-msgs 10000)
 
 (defvar mew-absfilter-map
@@ -111,10 +112,9 @@
 (defadvice mew-summary-setup-mode-line (after absfilter-process activate)
   "Display \"bsfilter\" in mode line.
 Advised in mew-absfilter.el"
-  (let ((absfilter (list 'mew-absfilter-summary-process
-			 'mew-absfilter-summary-process-status)))
-    (unless (assq absfilter mode-line-process)
-      (setq mode-line-process (cons absfilter mode-line-process)))))
+  (add-to-list 'mode-line-process
+	       (list 'mew-absfilter-summary-process
+		     'mew-absfilter-summary-process-status)))
 
 (defun mew-absfilter-add-clean (files)
   (apply 'call-process
@@ -129,7 +129,7 @@ Advised in mew-absfilter.el"
 ;; spam check
 (defun mew-absfilter-collect-message-region (begin end)
   "Returns a list of message number in region."
-  (let ((msgs nil))
+  (let (msgs)
     (save-excursion
       (save-restriction
 	(narrow-to-region begin end)
@@ -140,6 +140,16 @@ Advised in mew-absfilter.el"
 	    (push (mew-sumsyn-message-number) msgs))
 	  (forward-line))))
     (nreverse msgs)))
+
+(defun mew-absfilter-collect-spam-message ()
+  (let (spam)
+    (save-excursion
+      (goto-char (point-min))
+      (while (not (eobp))
+	(when (looking-at mew-regex-message-files2)
+	  (push (mew-match-string 0) spam))
+	(forward-line)))
+    (nreverse spam)))
 
 (defun mew-absfilter-check-spam-region (case:folder begin end)
   (mew-pickable
@@ -172,8 +182,8 @@ Advised in mew-absfilter.el"
 (defun mew-absfilter-apply-spam-action (case:folder spam)
   (when (and spam
 	     (get-buffer case:folder))
-    (let ((vfolder (mew-folder-to-thread case:folder)))
-      (save-excursion
+    (save-excursion
+      (let ((vfolder (mew-folder-to-thread case:folder)))
 	;; mark in thread if exists
 	(when (and (get-buffer vfolder)
 		   (mew-virtual-thread-p vfolder)
@@ -184,41 +194,34 @@ Advised in mew-absfilter.el"
 	    (set-buffer vfolder)
 	    (save-excursion
 	      (dolist (msg msgs)
-		(goto-char (point-min))
-		(if (re-search-forward (mew-regex-sumsyn-msg msg) nil t)
+		(if (or (re-search-forward (mew-regex-sumsyn-msg msg) nil t)
+			(re-search-backward (mew-regex-sumsyn-msg msg) nil t))
 		    (mew-absfilter-summary-spam-one 'no-msg)
 		  ;; if msg is not found, try to mark in physical folder
-		  (push msg spam))))))
-	(when spam
-	  (set-buffer case:folder)
-	  (save-excursion
-	    (dolist (msg spam)
-	      (goto-char (point-min))
-	      (when (re-search-forward (mew-regex-sumsyn-msg msg) nil t)
-		(mew-absfilter-summary-spam-one 'no-msg)))))))))
-
-(defun mew-absfilter-collect-spam-message ()
-  (save-excursion
-    (let (spam)
-      (goto-char (point-min))
-      (when (looking-at "Can't exec program: ")
-	(error "bsfilter error. %s"
-	       (mew-buffer-substring (point) (line-end-position))))
-      (while (not (eobp))
-	(when (looking-at mew-regex-message-files2)
-	  (push (mew-match-string 0) spam))
-	(forward-line))
-      (nreverse spam))))
+		  (push msg spam)))))))
+      (when spam
+	(set-buffer case:folder)
+	(save-excursion
+	  (dolist (msg spam)
+	    (when (or (re-search-forward (mew-regex-sumsyn-msg msg) nil t)
+		      (re-search-backward (mew-regex-sumsyn-msg msg) nil t))
+	      (mew-absfilter-summary-spam-one 'no-msg))))))))
 
 (defun mew-absfilter-sentinel (process event)
-  (mew-filter
-   (let ((case:folder mew-absfilter-process-folder)
-	 (spam (mew-absfilter-collect-spam-message)))
-     (mew-absfilter-apply-spam-action case:folder spam)))
-  (setq mew-absfilter-summary-process
-	(delq process mew-absfilter-summary-process))
-  (kill-buffer (process-buffer process))
-  (message "Spam checking...done"))
+  ;; exit status of "bsfilter --list-spam"
+  ;;  0: some spams are found
+  ;;  1: spam not found
+  (let ((status (process-exit-status process)))
+    (when (zerop status)
+      (mew-filter
+       (let ((case:folder mew-absfilter-process-folder)
+	     (spam (mew-absfilter-collect-spam-message)))
+	 (mew-absfilter-apply-spam-action case:folder spam))))
+    (setq mew-absfilter-summary-process
+	  (delq process mew-absfilter-summary-process))
+    (kill-buffer (process-buffer process))
+    (message "Spam checking...%s"
+	     (if (or (= status 0) (= status 1)) "done" event))))
 
 
 ;;; commands
@@ -242,7 +245,6 @@ Advised in mew-absfilter.el"
   (interactive)
   (mew-summary-msg-or-part
    (mew-summary-goto-message)
-   (mew-decode-syntax-delete)
    (when (mew-sumsyn-match mew-regex-sumsyn-short)
      (let* ((msg (mew-sumsyn-message-number))
 	    (case:folder (mew-sumsyn-folder-name))
@@ -348,16 +350,17 @@ Save `mew-absfilter-spam-folder-max-msgs' messages."
 	  'mew-absfilter-check-spam-after-retrieve)
 (add-hook 'mew-nntp-sentinel-hook
 	  'mew-absfilter-check-spam-after-retrieve)
-;; (add-hook 'mew-scan-sentinel-hook
-;; 	  'mew-absfilter-check-spam-after-retrieve)
+(add-hook 'mew-scan-sentinel-hook
+  	  'mew-absfilter-check-spam-after-retrieve)
+
+;; mew-local-sentinel does not let-bind `directive'
+;; and that information is lost by (mew-info-clean-up pnm)
+;; when mew-scan-sentinel-hook is called.
 (defadvice mew-local-sentinel (around absfilter-check activate)
-  "Check spam.
+  "Bind `directive' for spam checking.
 Advised in mew-absfilter.el"
-  (let* ((pnm (process-name process))
-	 (bnm (mew-local-get-bnm pnm))
-	 (directive (mew-local-get-directive pnm)))
-    ad-do-it
-    (mew-absfilter-check-spam-after-retrieve)))
+  (let ((directive (mew-local-get-directive (process-name process))))
+    ad-do-it))
 
 ;;; Check after `mew-shimbun-retrieve'
 
