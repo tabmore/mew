@@ -66,7 +66,6 @@
 	     (cons mew-absfilter-mark-spam 'mew-absfilter-face-mark-spam))
 
 
-;;; bsfilter
 (defvar mew-absfilter-program "bsfilter")
 (defvar mew-absfilter-arg-check '("--quiet" "--list-spam"))
 (defvar mew-absfilter-arg-clean '("--sub-spam" "--add-clean" "--update"))
@@ -216,8 +215,7 @@
 		(concat "failed. " event))))
      (kill-buffer (current-buffer)))))
 
-
-;;; commands
+;; commands
 (defun mew-absfilter-learn-clean (&optional mark-only)
   "Learn this message as clean (not spam)."
   (interactive "P")
@@ -315,7 +313,11 @@ Save `mew-absfilter-spam-folder-max-msgs' messages."
       (mew-summary-exec-region (point) pos))))
 
 
-;;; Check after `mew-summary-retrieve'.
+;;; Check after retrieve
+(defvar mew-absfilter-check t
+  "When to check with bsfilter.
+If t, do full check. Otherwise, the value should be a list whose element
+is one of `local', `pop', `imap', `nntp', or `shimbun'.")
 
 ;; biff scan inc sync exec get list jobs
 (defvar mew-absfilter-check-directive-list '(("+" inc)
@@ -348,8 +350,7 @@ Advised in mew-absfilter.el"
   (let ((directive (mew-local-get-directive (process-name process))))
     ad-do-it))
 
-;;; Check after `mew-shimbun-retrieve'
-
+;; Check after `mew-shimbun-retrieve'
 (defun mew-absfilter-shimbun-retrieve-set-start-point ()
   "Set retrieve start point."
   (mew-sinfo-set-start-point (point-max)))
@@ -359,7 +360,6 @@ Advised in mew-absfilter.el"
   (mew-absfilter-check-spam-region (mew-summary-folder-name 'ext)
 				   (mew-sinfo-get-start-point) (point-max)))
 
-
 ;; modeline
 (defadvice mew-summary-setup-mode-line (after absfilter-process disable)
   "Display \"bsfilter\" in mode line.
@@ -382,28 +382,6 @@ Advised in mew-absfilter.el"
     (unless no-msg
       (message "bsfilter is running. Try again later"))
     (setq ad-return-value nil)))
-
-(defvar mew-absfilter-check t
-  "When to check with bsfilter.
-If t, do full check. Otherwise, the value should be a list whose element
-is one of `local', `pop', `imap', `nntp', or `shimbun'.")
-
-(defvar mew-absfilter-mode nil)
-;;;###autoload
-(defun mew-absfilter-mode (&optional arg)
-  "Enable or disable bsfilter checking.
-See `mew-absfilter-check' when bsfilter is run."
-  (interactive "P")
-  (let ((mode (if arg
-		  (> (prefix-numeric-value arg) 0)
-		(not mew-absfilter-mode))))
-    (when (and mode
-	       (not (mew-which-exec mew-absfilter-program)))
-      (error "`%s' not found" mew-absfilter-program))
-    (setq mew-absfilter-mode mode)
-    (mew-absfilter-mode-activate (if mode mew-absfilter-check))
-    (when (interactive-p)
-      (message "bsfilter checking is %s" (if mode "enabled" "disabled")))))
 
 (defun mew-absfilter-mode-activate (initialize)
   (let ((all '(local pop imap nntp shimbun))
@@ -445,6 +423,23 @@ See `mew-absfilter-check' when bsfilter is run."
     (funcall ad-func 'mew-summary-exclusive-p 'after 'absfilter-process)
     (ad-activate 'mew-summary-setup-mode-line)
     (ad-activate 'mew-summary-exclusive-p)))
+
+(defvar mew-absfilter-mode nil)
+;;;###autoload
+(defun mew-absfilter-mode (&optional arg)
+  "Enable or disable bsfilter checking.
+See `mew-absfilter-check' when bsfilter is run."
+  (interactive "P")
+  (let ((mode (if arg
+		  (> (prefix-numeric-value arg) 0)
+		(not mew-absfilter-mode))))
+    (when (and mode
+	       (not (mew-which-exec mew-absfilter-program)))
+      (error "`%s' not found" mew-absfilter-program))
+    (setq mew-absfilter-mode mode)
+    (mew-absfilter-mode-activate (if mode mew-absfilter-check))
+    (when (interactive-p)
+      (message "bsfilter checking is %s" (if mode "enabled" "disabled")))))
 
 (provide 'mew-absfilter)
 
