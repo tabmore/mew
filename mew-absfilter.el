@@ -394,6 +394,9 @@ See `mew-absfilter-check' when bsfilter is run."
   (let ((mode (if arg
 		  (> (prefix-numeric-value arg) 0)
 		(not mew-absfilter-mode))))
+    (when (and mode
+	       (not (mew-which-exec mew-absfilter-program)))
+      (error "`%s' not found" mew-absfilter-program))
     (setq mew-absfilter-mode mode)
     (mew-absfilter-mode-activate (if mode mew-absfilter-check))
     (when (interactive-p)
