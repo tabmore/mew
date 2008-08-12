@@ -29,93 +29,14 @@
 
 (unless mew-bsfilter-map
   (setq mew-bsfilter-map (make-sparse-keymap))
-  (define-key mew-bsfilter-map "c" 'mew-bsfilter-clean)
-  (define-key mew-bsfilter-map "s" 'mew-bsfilter-spam)
-  (define-key mew-bsfilter-map "mc" 'mew-bsfilter-mark-clean)
-  (define-key mew-bsfilter-map "ms" 'mew-bsfilter-mark-spam)
+  (define-key mew-bsfilter-map "c" 'mew-bsfilter-learn-clean)
+  (define-key mew-bsfilter-map "s" 'mew-bsfilter-learn-spam)
+  (define-key mew-bsfilter-map "mc" 'mew-bsfilter-learn-clean-multi)
+  (define-key mew-bsfilter-map "ms" 'mew-bsfilter-learn-spam-multi)
   (define-key mew-bsfilter-map "b" 'mew-bsfilter-check-spam))
 
 (define-key mew-summary-mode-map "b" mew-bsfilter-map)
 
-
-;; Use buffer-local-variable in process-buffer.
-;; process-{put,get} is avairable only in Emacs-21.4 or above.
-(defvar mew-bsfilter-process-folder nil)
-(make-variable-buffer-local 'mew-bsfilter-process-folder)
-
-;; modeline
-(defvar mew-summary-buffer-bsfilter-process nil)
-(defvar mew-summary-buffer-bsfilter-process-status " bsfilter")
-
-(defadvice mew-summary-setup-mode-line (after bsfilter-process activate)
-  (let ((bsfilter (list 'mew-summary-buffer-bsfilter-process
-			'mew-summary-buffer-bsfilter-process-status)))
-    (unless (assq bsfilter mode-line-process)
-      (setq mode-line-process (cons bsfilter mode-line-process)))))
-
-
-(defun mew-bsfilter-clean (&optional wait no-msg)
-  "Mark this message as clean (not spam)."
-  (interactive)
-  (when (mew-sumsyn-match mew-regex-sumsyn-short)
-    (let* ((msg (mew-sumsyn-message-number))
-	   (fld (mew-sumsyn-folder-name))
-	   (path (mew-expand-folder fld msg)))
-      (setq wait (if wait nil 0))
-      (apply 'call-process
-	     mew-bsfilter-program nil wait nil
-	     (append mew-bsfilter-arg-clean (list path)))
-      (mew-bsfilter-undo-action (mew-bsfilter-folder-action fld)))
-    (unless no-msg
-      (message "Marked as clean"))))
-
-(defun mew-bsfilter-spam (&optional wait no-msg)
-  "Mark this message as spam."
-  (interactive)
-  (when (mew-sumsyn-match mew-regex-sumsyn-short)
-    (let* ((msg (mew-sumsyn-message-number))
-	   (fld (mew-sumsyn-folder-name))
-	   (path (mew-expand-folder fld msg)))
-      (setq wait (if wait nil 0))
-      (apply 'call-process
-	     mew-bsfilter-program nil wait nil
-	     (append mew-bsfilter-arg-spam (list path)))
-      (mew-bsfilter-do-action (mew-bsfilter-folder-action fld) t))
-    (unless no-msg
-      (message "Marked as spam"))))
-
-(defmacro mew-bsfilter-each-mark-msg (mark region &rest body)
-  `(let ((begend (when ,region (mew-summary-get-region))))
-     (mew-decode-syntax-delete)
-     (save-excursion
-       (dolist (msg (mew-summary-mark-collect ,mark (car begend) (cdr begend)))
-	 (goto-char (point-min))
-	 (when (re-search-forward (mew-regex-sumsyn-msg msg) nil t)
-	   ,@body)))))
-
-(defun mew-bsfilter-mark-clean (&optional arg)
-  (interactive "P")
-  (message "Marking as clean...")
-  (mew-bsfilter-each-mark-msg mew-mark-review arg
-			      (mew-bsfilter-clean t t))
-  (message "Marking as clean...done"))
-
-(defun mew-bsfilter-mark-spam (&optional arg)
-  (interactive "P")
-  (message "Marking as spam...")
-  (mew-bsfilter-each-mark-msg mew-mark-review arg
-			      (mew-bsfilter-spam t t))
-  (message "Marking as spam...done"))
-
-(defun mew-bsfilter-check-spam (&optional arg)
-  "Check spam messages with bsfilter."
-  (interactive "P")
-  (mew-summary-or-thread
-   (let ((region (if arg
-		     (mew-summary-get-region)
-		   (cons (point-min) (point-max)))))
-     (mew-bsfilter-check-spam-region (mew-summary-folder-name)
-				     (car region) (cdr region)))))
 
 (defun mew-bsfilter-folder-action (folder)
   (let ((action (catch 'found
@@ -163,6 +84,72 @@
 	(when (eq action mark)
 	  (mew-summary-undo)))))))
 
+(defun mew-bsfilter-add-clean (files)
+  (apply 'call-process
+	 mew-bsfilter-program nil 0 nil (append mew-bsfilter-arg-clean files)))
+
+(defun mew-bsfilter-add-spam (files)
+  (apply 'call-process
+	 mew-bsfilter-program nil 0 nil (append mew-bsfilter-arg-spam files)))
+
+(defun mew-bsfilter-learn-clean ()
+  "Mark this message as clean (not spam)."
+  (interactive)
+  (mew-summary-msg-or-part
+   (mew-summary-goto-message)
+   (when (mew-sumsyn-match mew-regex-sumsyn-short)
+     (let* ((msg (mew-sumsyn-message-number))
+	    (fld (mew-sumsyn-folder-name))
+	    (file (mew-expand-folder fld msg)))
+       (mew-bsfilter-add-clean (list file))
+       (mew-bsfilter-undo-action (mew-bsfilter-folder-action fld)))
+     (message "Marked as clean"))))
+
+(defun mew-bsfilter-learn-spam ()
+  "Mark this message as spam."
+  (interactive)
+  (mew-summary-msg-or-part
+   (mew-summary-goto-message)
+   (when (mew-sumsyn-match mew-regex-sumsyn-short)
+     (let* ((msg (mew-sumsyn-message-number))
+	    (fld (mew-sumsyn-folder-name))
+	    (file (mew-expand-folder fld msg)))
+       (mew-bsfilter-add-spam (list file))
+       (mew-bsfilter-do-action (mew-bsfilter-folder-action fld) t))
+     (message "Marked as spam"))))
+
+(defun mew-bsfilter-learn-clean-multi ()
+  (interactive)
+  (mew-summary-multi-msgs
+   (message "Marking as clean...")
+   (mew-bsfilter-add-clean FILES)
+   (mew-mark-undo-mark mew-mark-multi)
+   (message "Marking as clean...done")))
+
+(defun mew-bsfilter-learn-spam-multi ()
+  (interactive)
+  (mew-summary-multi-msgs
+   (message "Marking as spam...")
+   (mew-bsfilter-add-spam FILES)
+   (mew-mark-undo-mark mew-mark-multi)
+   (message "Marking as spam...done")))
+
+;; check
+(defun mew-bsfilter-collect-message-region (begin end)
+  "This function returns a list of message number."
+  (mew-summary-or-thread
+   (save-excursion
+     (let ((regex (mew-mark-regex ? ))
+	   (msglist nil))
+       (goto-char begin)
+       (while (re-search-forward regex end t)
+	 (when (mew-sumsyn-match mew-regex-sumsyn-short)
+	   (let ((msg (mew-sumsyn-message-number))
+		 (fld (mew-sumsyn-folder-name)))
+	     (setq msglist (cons (mew-expand-folder fld msg) msglist))))
+	 (forward-line))
+       (nreverse msglist)))))
+
 (defun mew-bsfilter-check-spam-region (folder begin end)
   (if (not (and folder
 	       (with-current-buffer folder (mew-summary-p))))
@@ -182,44 +169,6 @@
 	(set-process-sentinel process 'mew-bsfilter-sentinel)
 	(add-to-list 'mew-summary-buffer-bsfilter-process process)))))
 
-(defun mew-bsfilter-sentinel (process event)
-  (mew-filter
-   (let* ((fld mew-bsfilter-process-folder)
-	  (spam (mew-bsfilter-collect-spam-message fld)))
-     (mew-bsfilter-apply-spam-action fld spam)))
-  (setq mew-summary-buffer-bsfilter-process
-	(delq process mew-summary-buffer-bsfilter-process))
-  (kill-buffer (process-buffer process))
-  (message "Spam checking...done"))
-
-(defun mew-bsfilter-collect-message-region (begin end)
-  "This function returns a list of message number."
-  (mew-summary-or-thread
-   (save-excursion
-     (let ((regex (mew-mark-regex ? ))
-	   (msglist nil))
-       (goto-char begin)
-       (while (re-search-forward regex end t)
-	 (when (mew-sumsyn-match mew-regex-sumsyn-short)
-	   (let ((msg (mew-sumsyn-message-number))
-		 (fld (mew-sumsyn-folder-name)))
-	     (setq msglist (cons (mew-expand-folder fld msg) msglist))))
-	 (forward-line))
-       (nreverse msglist)))))
-
-(defun mew-bsfilter-collect-spam-message (folder)
-  (save-excursion
-    (let ((regexp (format " %s/\\([^ ]+\\) [^ ]+ \\(.+\\)$"
-			  (regexp-quote (mew-expand-folder folder))))
-	  spam)
-      (goto-char (point-min))
-      (while (re-search-forward regexp nil t)
-	(let ((msg (mew-match-string 1))
-	      (score (string-to-number (mew-match-string 2))))
-	  (when (> score mew-bsfilter-spam-cutoff)
-	    (setq spam (cons msg spam)))))
-      (nreverse spam))))
-
 (defun mew-bsfilter-apply-spam-action (folder spam)
   (let* ((vfolder (mew-folder-to-thread folder))
 	 (buf (if (and (get-buffer vfolder)
@@ -236,6 +185,39 @@
 	  (goto-char (point-min))
 	  (when (re-search-forward (mew-regex-sumsyn-msg msg) nil t)
 	    (mew-bsfilter-do-action action)))))))
+
+(defun mew-bsfilter-collect-spam-message (folder)
+  (save-excursion
+    (let ((regexp (format " %s/\\([^ ]+\\) [^ ]+ \\(.+\\)$"
+			  (regexp-quote (mew-expand-folder folder))))
+	  spam)
+      (goto-char (point-min))
+      (while (re-search-forward regexp nil t)
+	(let ((msg (mew-match-string 1))
+	      (score (string-to-number (mew-match-string 2))))
+	  (when (> score mew-bsfilter-spam-cutoff)
+	    (setq spam (cons msg spam)))))
+      (nreverse spam))))
+
+(defun mew-bsfilter-sentinel (process event)
+  (mew-filter
+   (let* ((fld mew-bsfilter-process-folder)
+	  (spam (mew-bsfilter-collect-spam-message fld)))
+     (mew-bsfilter-apply-spam-action fld spam)))
+  (setq mew-summary-buffer-bsfilter-process
+	(delq process mew-summary-buffer-bsfilter-process))
+  (kill-buffer (process-buffer process))
+  (message "Spam checking...done"))
+
+(defun mew-bsfilter-check-spam (&optional arg)
+  "Check spam messages with bsfilter."
+  (interactive "P")
+  (mew-summary-or-thread
+   (let ((region (if arg
+		     (mew-summary-get-region)
+		   (cons (point-min) (point-max)))))
+     (mew-bsfilter-check-spam-region (mew-summary-folder-name)
+				     (car region) (cdr region)))))
 
 
 ;;; Check after `mew-summary-retrieve'.
@@ -288,6 +270,21 @@
 
 (add-hook 'mew-shimbun-retrieve-hook
 	  'mew-bsfilter-check-spam-after-shimbun-retrieve)
+
+;; Use buffer-local-variable in process-buffer.
+;; process-{put,get} is avairable only in Emacs-21.4 or above.
+(defvar mew-bsfilter-process-folder nil)
+(make-variable-buffer-local 'mew-bsfilter-process-folder)
+
+;; modeline
+(defvar mew-summary-buffer-bsfilter-process nil)
+(defvar mew-summary-buffer-bsfilter-process-status " bsfilter")
+
+(defadvice mew-summary-setup-mode-line (after bsfilter-process activate)
+  (let ((bsfilter (list 'mew-summary-buffer-bsfilter-process
+			'mew-summary-buffer-bsfilter-process-status)))
+    (unless (assq bsfilter mode-line-process)
+      (setq mode-line-process (cons bsfilter mode-line-process)))))
 
 (provide 'mew-bsfilter)
 
