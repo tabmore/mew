@@ -197,9 +197,11 @@
 	(action (mew-bsfilter-folder-action case:folder)))
     (save-excursion
       (when (and spam
+		 (get-buffer case:folder)
 		 (get-buffer vfolder)
 		 (mew-virtual-thread-p vfolder)
-		 (mew-thread-cache-valid-p vfolder))
+		 (with-current-buffer case:folder
+		   (mew-thread-cache-valid-p vfolder)))
 	(let ((msgs spam))
 	  (setq spam nil)
 	  (set-buffer vfolder)
