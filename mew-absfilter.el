@@ -225,52 +225,56 @@ Advised in mew-absfilter.el"
 
 
 ;;; commands
-(defun mew-absfilter-learn-clean (&optional no-msg)
+(defun mew-absfilter-learn-clean (&optional mark-only)
   "Learn this message as clean (not spam)."
-  (interactive)
+  (interactive "P")
   (mew-summary-msg-or-part
    (mew-summary-goto-message)
    (when (mew-sumsyn-match mew-regex-sumsyn-short)
      (let* ((msg (mew-sumsyn-message-number))
 	    (case:folder (mew-sumsyn-folder-name))
 	    (file (mew-expand-folder case:folder msg)))
-       (mew-absfilter-add-clean (list file))
        (when (eq (mew-summary-get-mark) mew-absfilter-mark-spam)
-	 (mew-summary-undo)))
-     (unless no-msg
-       (message "Learned as clean")))))
+	 (mew-summary-undo))
+       (unless mark-only
+	 (mew-absfilter-add-clean (list file))
+	 (message "Learned as clean"))))))
 
-(defun mew-absfilter-learn-spam (&optional no-msg)
+(defun mew-absfilter-learn-spam (&optional mark-only)
   "Learn this message as spam."
-  (interactive)
+  (interactive "P")
   (mew-summary-msg-or-part
    (mew-summary-goto-message)
    (when (mew-sumsyn-match mew-regex-sumsyn-short)
      (let* ((msg (mew-sumsyn-message-number))
 	    (case:folder (mew-sumsyn-folder-name))
 	    (file (mew-expand-folder case:folder msg)))
-       (mew-absfilter-add-spam (list file))
-       (mew-absfilter-summary-spam-one no-msg))
-     (unless no-msg
-       (message "Learned as spam")))))
+       (mew-absfilter-summary-spam-one)
+       (unless mark-only
+	 (mew-absfilter-add-spam (list file))
+	 (message "Learned as spam"))))))
 
-(defun mew-absfilter-mark-learn-clean ()
+(defun mew-absfilter-mark-learn-clean (&optional mark-only)
   "Learn all messages marked with '*' as clean (not spam)."
-  (interactive)
+  (interactive "P")
   (mew-summary-multi-msgs
-   (message "Learning as clean...")
-   (mew-absfilter-add-clean FILES)
-   (message "Learning as clean...done")
-   (mew-mark-undo-mark mew-mark-review)))
+   (mew-mark-undo-mark mew-mark-review)
+   (unless mark-only
+     (message "Learning as clean...")
+     (mew-absfilter-add-clean FILES)
+     (message "Learning as clean...done"))))
+   
 
-(defun mew-absfilter-mark-learn-spam ()
+(defun mew-absfilter-mark-learn-spam (&optional mark-only)
   "Learn all messages marked with '*' as spam."
-  (interactive)
+  (interactive "P")
   (mew-summary-multi-msgs
-   (message "Learning as spam...")
-   (mew-absfilter-add-spam FILES)
-   (message "Learning as spam...done")
-   (mew-mark-undo-mark mew-mark-review)))
+   (mew-mark-undo-mark mew-mark-review)   
+   (unless mark-only
+     (message "Learning as spam...")
+     (mew-absfilter-add-spam FILES)
+     (message "Learning as spam...done"))))
+   
 
 ;; (defun mew-absfilter-thread-mark-learn-spam ()
 ;;   "Put the ';' mark on all messages of the current sub-thread."
@@ -304,10 +308,10 @@ Advised in mew-absfilter.el"
     (mew-absfilter-check-spam-region (mew-summary-folder-name)
 				     (car region) (cdr region))))
 
-(defun mew-absfilter-clean-spam-folder ()
+(defun mew-absfilter-clean-spam-folder (&optional unlink)
   "Remove old spam.
 Save `mew-absfilter-spam-folder-max-msgs' messages."
-  (interactive)
+  (interactive "P")
   (mew-summary-visit-folder mew-absfilter-spam-folder)
   (mew-rendezvous mew-summary-buffer-process)
   (mew-decode-syntax-delete)
@@ -316,7 +320,7 @@ Save `mew-absfilter-spam-folder-max-msgs' messages."
     (forward-line (- mew-absfilter-spam-folder-max-msgs))
     (let ((pos (point)))
       (while (zerop (forward-line -1))
-	(mew-summary-mark-as mew-mark-delete))
+	(mew-summary-mark-as (if unlink mew-mark-unlink mew-mark-delete)))
       (mew-summary-exec-region (point) pos))))
 
 
