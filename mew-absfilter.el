@@ -60,7 +60,7 @@
 
 ;; register spam mark
 (add-to-list 'mew-mark-afterstep-spec
-	     (list mew-absfilter-mark-spam 1 1 1 1 1 1 1))
+	     (list mew-absfilter-mark-spam 2 2 2 2 0 2 0))
 (add-to-list 'mew-mark-spec
 	     (list mew-absfilter-mark-spam "spam" 2 nil
 		   'mew-absfilter-mark-kill-spam nil
