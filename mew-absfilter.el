@@ -1,4 +1,4 @@
-;;; mew-absfilter.el --- spam filter with calling bsfilter asynchronously
+;;; mew-absfilter.el --- spam filter with bsfilter for Mew
 
 ;; Author: SAITO Takuya <reed@lily.freemail.ne.jp>
 ;; $Id$
