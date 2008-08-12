@@ -41,7 +41,6 @@
 ;; Use buffer-local-variable in process-buffer.
 ;; process-{put,get} is avairable only in Emacs-21.4 or above.
 (defvar mew-bsfilter-process-folder nil)
-(make-variable-buffer-local 'mew-bsfilter-process-folder)
 
 ;; modeline
 (defvar mew-summary-buffer-bsfilter-process nil)
@@ -53,15 +52,15 @@
     (unless (assq bsfilter mode-line-process)
       (setq mode-line-process (cons bsfilter mode-line-process)))))
 
-(defun mew-bsfilter-folder-action (folder)
+(defun mew-bsfilter-folder-action (case:folder)
   (let ((action (catch 'found
 		  (dolist (act mew-bsfilter-spam-action)
 		    (when (or (eq (car act) t)
-			      ;; use (mew-folder-folder folder) ?
-			      (string-match (car act) folder))
+			      ;; use (mew-case:folder-folder folder) ?
+			      (string-match (car act) case:folder))
 		      (throw 'found (cadr act)))))))
     (when (stringp action)
-      (let ((prefix (mew-folder-prefix (mew-folder-folder folder))))
+      (let ((prefix (mew-folder-prefix (mew-case:folder-folder case:folder))))
 	(setq action (delq nil
 			   (mapcar
 			    (lambda (fld)
@@ -86,13 +85,13 @@
 (defun mew-bsfilter-undo-action (action)
   (when (mew-sumsyn-match mew-regex-sumsyn-short)
     (let ((msg (mew-sumsyn-message-number))
-	  (fld (mew-sumsyn-folder-name))
+	  (case:folder (mew-sumsyn-folder-name))
 	  (mark (mew-summary-get-mark)))
       (cond
        ((listp action)
 	(when (and (eq mark mew-mark-refile)
-		   (get-buffer fld)
-		   (equal action (cdr (with-current-buffer fld
+		   (get-buffer case:folder)
+		   (equal action (cdr (with-current-buffer case:folder
 					(mew-refile-get msg)))))
 	  (mew-summary-undo)))
        ((integerp action)
@@ -114,10 +113,10 @@
    (mew-summary-goto-message)
    (when (mew-sumsyn-match mew-regex-sumsyn-short)
      (let* ((msg (mew-sumsyn-message-number))
-	    (fld (mew-sumsyn-folder-name))
-	    (file (mew-expand-folder fld msg)))
+	    (case:folder (mew-sumsyn-folder-name))
+	    (file (mew-expand-folder case:folder msg)))
        (mew-bsfilter-add-clean (list file))
-       (mew-bsfilter-undo-action (mew-bsfilter-folder-action fld)))
+       (mew-bsfilter-undo-action (mew-bsfilter-folder-action case:folder)))
      (message "Marked as clean"))))
 
 (defun mew-bsfilter-learn-spam ()
@@ -127,10 +126,10 @@
    (mew-summary-goto-message)
    (when (mew-sumsyn-match mew-regex-sumsyn-short)
      (let* ((msg (mew-sumsyn-message-number))
-	    (fld (mew-sumsyn-folder-name))
-	    (file (mew-expand-folder fld msg)))
+	    (case:folder (mew-sumsyn-folder-name))
+	    (file (mew-expand-folder case:folder msg)))
        (mew-bsfilter-add-spam (list file))
-       (mew-bsfilter-do-action (mew-bsfilter-folder-action fld) t))
+       (mew-bsfilter-do-action (mew-bsfilter-folder-action case:folder) t))
      (message "Marked as spam"))))
 
 (defun mew-bsfilter-learn-clean-multi ()
@@ -160,14 +159,14 @@
        (while (re-search-forward regex end t)
 	 (when (mew-sumsyn-match mew-regex-sumsyn-short)
 	   (let ((msg (mew-sumsyn-message-number))
-		 (fld (mew-sumsyn-folder-name)))
-	     (setq msglist (cons (mew-expand-folder fld msg) msglist))))
+		 (case:folder (mew-sumsyn-folder-name)))
+	     (setq msglist (cons (mew-expand-folder case:folder msg) msglist))))
 	 (forward-line))
        (nreverse msglist)))))
 
-(defun mew-bsfilter-check-spam-region (folder begin end)
-  (if (not (and folder
-	       (with-current-buffer folder (mew-summary-p))))
+(defun mew-bsfilter-check-spam-region (case:folder begin end)
+  (if (not (and case:folder
+	       (with-current-buffer case:folder (mew-summary-p))))
       (message "Can not spam check here")
     (let ((msglist (mew-bsfilter-collect-message-region begin end))
 	  process)
@@ -176,7 +175,7 @@
 	(set-buffer (get-buffer-create
 		     (generate-new-buffer-name " *mew bsfilter*")))
 	(mew-erase-buffer)
-	(setq mew-bsfilter-process-folder folder)
+	(set (make-local-variable 'mew-bsfilter-process-folder) case:folder)
 	(setq process (apply 'start-process "mew-bsfilter"
 			     (current-buffer)
 			     mew-bsfilter-program
@@ -184,27 +183,27 @@
 	(set-process-sentinel process 'mew-bsfilter-sentinel)
 	(add-to-list 'mew-summary-buffer-bsfilter-process process)))))
 
-(defun mew-bsfilter-apply-spam-action (folder spam)
-  (let* ((vfolder (mew-folder-to-thread folder))
+(defun mew-bsfilter-apply-spam-action (case:folder spam)
+  (let* ((vfolder (mew-folder-to-thread case:folder))
 	 (buf (if (and (get-buffer vfolder)
 		       (mew-virtual-thread-p vfolder)
 		       (mew-thread-cache-valid-p vfolder))
 		  vfolder
-		folder))
+		case:folder))
 	 action)
     (when (get-buffer buf)
       (set-buffer buf)
-      (setq action (mew-bsfilter-folder-action folder))
+      (setq action (mew-bsfilter-folder-action case:folder))
       (save-excursion
 	(dolist (msg spam)
 	  (goto-char (point-min))
 	  (when (re-search-forward (mew-regex-sumsyn-msg msg) nil t)
 	    (mew-bsfilter-do-action action)))))))
 
-(defun mew-bsfilter-collect-spam-message (folder)
+(defun mew-bsfilter-collect-spam-message (case:folder)
   (save-excursion
     (let ((regexp (format " %s/\\([^ ]+\\) [^ ]+ \\(.+\\)$"
-			  (regexp-quote (mew-expand-folder folder))))
+			  (regexp-quote (mew-expand-folder case:folder))))
 	  spam)
       (goto-char (point-min))
       (while (re-search-forward regexp nil t)
@@ -216,9 +215,9 @@
 
 (defun mew-bsfilter-sentinel (process event)
   (mew-filter
-   (let* ((fld mew-bsfilter-process-folder)
-	  (spam (mew-bsfilter-collect-spam-message fld)))
-     (mew-bsfilter-apply-spam-action fld spam)))
+   (let* ((case:folder mew-bsfilter-process-folder)
+	  (spam (mew-bsfilter-collect-spam-message case:folder)))
+     (mew-bsfilter-apply-spam-action case:folder spam)))
   (setq mew-summary-buffer-bsfilter-process
 	(delq process mew-summary-buffer-bsfilter-process))
   (kill-buffer (process-buffer process))
