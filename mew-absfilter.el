@@ -10,24 +10,20 @@
 
 ;; You can find bsfilter at http://bsfilter.org/
 
-;; Some operations should not be executed during bsfilter check like
-;; - "O" (mew-summary-pack)
-;; - 'refile + inc'
-
 ;; When you find bsfilter marks the clean message as spam,
 ;; use "bc" (mew-absfilter-learn-clean) instead of "u" (mew-summary-undo)
 
 ;; With "bx" (mew-absfilter-summary-exec-spam), you can process spam mark
 ;; even in nntp.
 
-;; If you want to do spam check after shimbun retrieve,
+;; If you want to do spam checking after shimbun retrieve,
 ;; - Do not use `mew-shimbun-retrieve-all', because it kills the shimbun buffer
 ;; - Set start-point like this:
 ;; (defun mew-shimbun-retrieve-set-start-point ()
 ;;   "Set retrieve start point."
 ;;   (mew-sinfo-set-start-point (point-max)))
 ;; (add-hook 'mew-shimbun-before-retrieve-hook
-;; 	  'mew-shimbun-retrieve-set-start-point)
+;;           'mew-shimbun-retrieve-set-start-point)
 
 ;;; Code:
 
@@ -101,20 +97,12 @@
 ;; (define-key mew-summary-mode-map
 ;;   [remap mew-summary-learn-ham] 'mew-absfilter-learn-clean)
 
+
+(defvar mew-absfilter-summary-buffer-process nil)
+(make-variable-buffer-local 'mew-absfilter-summary-buffer-process)
 ;; Use buffer-local-variable in process-buffer.
 ;; process-{put,get} is avairable only in Emacs-21.4 or above.
 (defvar mew-absfilter-process-folder nil)
-
-;; modeline
-(defvar mew-absfilter-summary-process nil)
-(defvar mew-absfilter-summary-process-status " bsfilter")
-
-(defadvice mew-summary-setup-mode-line (after absfilter-process activate)
-  "Display \"bsfilter\" in mode line.
-Advised in mew-absfilter.el"
-  (add-to-list 'mode-line-process
-	       (list 'mew-absfilter-summary-process
-		     'mew-absfilter-summary-process-status)))
 
 (defun mew-absfilter-add-clean (files)
   (apply 'call-process
@@ -152,32 +140,32 @@ Advised in mew-absfilter.el"
     (nreverse spam)))
 
 (defun mew-absfilter-check-spam-region (case:folder begin end)
-  (mew-pickable
-   (let ((msgs (with-current-buffer case:folder
-		 (mew-absfilter-collect-message-region begin end)))
-	 nxt)
-     (when msgs
-       (message "Spam checking..."))
-     (while msgs
-       (let ((buf (get-buffer-create
-		   (generate-new-buffer-name " *mew bsfilter*")))
-	     process)
-	 (with-current-buffer buf
-	   (cd (mew-expand-folder case:folder))
-	   (mew-erase-buffer)
-	   (set (make-local-variable 'mew-absfilter-process-folder)
-		case:folder))
-	 (setq nxt (nthcdr mew-absfilter-max-msgs msgs))
-	 (when nxt
-	   (setcdr (nthcdr (1- mew-absfilter-max-msgs) msgs) nil))
-	 (setq process (apply 'start-process "mew-absfilter" buf
-			      mew-absfilter-program
-			      (append mew-absfilter-arg-check msgs)))
-	 (set-process-sentinel process 'mew-absfilter-sentinel)
-	 (add-to-list 'mew-absfilter-summary-process process))
-       (setq msgs nxt)))
-   (when mew-absfilter-summary-process
-     (force-mode-line-update))))
+  (with-current-buffer case:folder
+    (mew-pickable
+     (let ((msgs (mew-absfilter-collect-message-region begin end))
+	   nxt)
+       (when msgs
+	 (message "Spam checking..."))
+       (while msgs
+	 (let ((buf (get-buffer-create
+		     (generate-new-buffer-name " *mew bsfilter*")))
+	       process)
+	   (with-current-buffer buf
+	     (cd (mew-expand-folder case:folder))
+	     (mew-erase-buffer)
+	     (set (make-local-variable 'mew-absfilter-process-folder)
+		  case:folder))
+	   (setq nxt (nthcdr mew-absfilter-max-msgs msgs))
+	   (when nxt
+	     (setcdr (nthcdr (1- mew-absfilter-max-msgs) msgs) nil))
+	   (setq process (apply 'start-process "mew-absfilter" buf
+				mew-absfilter-program
+				(append mew-absfilter-arg-check msgs)))
+	   (set-process-sentinel process 'mew-absfilter-sentinel)
+	   (add-to-list 'mew-absfilter-summary-buffer-process process))
+	 (setq msgs nxt)))))
+  (when mew-absfilter-summary-buffer-process
+    (force-mode-line-update)))
 
 (defun mew-absfilter-apply-spam-action (case:folder spam)
   (when (and spam
@@ -211,17 +199,24 @@ Advised in mew-absfilter.el"
   ;; exit status of "bsfilter --list-spam"
   ;;  0: some spams are found
   ;;  1: spam not found
-  (let ((status (process-exit-status process)))
-    (when (zerop status)
-      (mew-filter
-       (let ((case:folder mew-absfilter-process-folder)
-	     (spam (mew-absfilter-collect-spam-message)))
-	 (mew-absfilter-apply-spam-action case:folder spam))))
-    (setq mew-absfilter-summary-process
-	  (delq process mew-absfilter-summary-process))
-    (kill-buffer (process-buffer process))
-    (message "Spam checking...%s"
-	     (if (or (= status 0) (= status 1)) "done" event))))
+  (mew-filter
+   (let ((status (process-exit-status process))
+	 (case:folder mew-absfilter-process-folder)
+	 (spam (mew-absfilter-collect-spam-message)))
+     (when (zerop status)
+       (mew-absfilter-apply-spam-action case:folder spam))
+     (with-current-buffer case:folder
+       (setq mew-absfilter-summary-buffer-process
+	     (delq process mew-absfilter-summary-buffer-process)))
+     (message "Spam checking...%s"
+	      (cond
+	       ((= status 0)
+		(format "done (%d spam found in %s)" (length spam) case:folder))
+	       ((= status 1)
+		(concat "done (spam not found in " case:folder ")"))
+	       (t
+		(concat "failed. " event))))
+     (kill-buffer (current-buffer)))))
 
 
 ;;; commands
@@ -275,7 +270,6 @@ Advised in mew-absfilter.el"
      (mew-absfilter-add-spam FILES)
      (message "Learning as spam...done"))))
    
-
 ;; (defun mew-absfilter-thread-mark-learn-spam ()
 ;;   "Put the ';' mark on all messages of the current sub-thread."
 ;;   (interactive)
@@ -377,24 +371,28 @@ Advised in mew-absfilter.el"
 	  'mew-absfilter-check-spam-after-shimbun-retrieve)
 
 
-;; inhibit pack
-(defadvice mew-summary-pack (around absfilter-inhibit activate)
-  "Inhibit pack during spam checking.
+;; modeline
+(defadvice mew-summary-setup-mode-line (after absfilter-process activate)
+  "Display \"bsfilter\" in mode line.
 Advised in mew-absfilter.el"
-  (let ((procs mew-absfilter-summary-process)
-	running buf)
-    (while (and (not running)
-		procs)
-      (setq buf (process-buffer (car procs))
-	    procs (cdr procs))
-      (when (and (buffer-live-p buf)
-		 (eq (with-current-buffer buf
-		       (get-buffer mew-absfilter-process-folder))
-		     (current-buffer)))
-	(setq running t)))
-    (if running
-	(message "bsfilter is running. Try later")
-      ad-do-it)))
+  (add-to-list 'mode-line-process
+	       (list 'mew-absfilter-summary-buffer-process " bsfilter")))
+
+;; inhibit pack, exec
+(defadvice mew-summary-exclusive-p (after bsfilter-process activate)
+  "Return nil when operation may break marking spam.
+`mew-absfilter-apply-spam-action' may put spam mark on the wrong message
+if message number is changed during bsfilter is running.
+The example of such operations are:
+ - \"O\" (mew-summary-pack)
+ - 'Refile' + \"i\" (mew-summary-retrieve)
+
+Advised in mew-absfilter.el"
+  (when (and mew-absfilter-summary-buffer-process
+	     (memq this-command '(mew-summary-exec mew-summary-pack)))
+    (unless no-msg
+      (message "bsfilter is running. Try again later"))
+    (setq ad-return-value nil)))
 
 
 (provide 'mew-absfilter)
