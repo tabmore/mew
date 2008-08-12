@@ -10,14 +10,17 @@
 
 ;; You can find bsfilter at http://bsfilter.org/
 
+;; To enable spam check after retrieve, put below into your ~/.emacs:
+;; (mew-absfilter-mode 1)
+
+;; If you want to do spam checking after shimbun retrieve,
+;; do not use `mew-shimbun-retrieve-all' because it kills the shimbun buffer.
+
 ;; When you find bsfilter marks the clean message as spam,
 ;; use "bc" (mew-absfilter-learn-clean) instead of "u" (mew-summary-undo)
 
 ;; With "bx" (mew-absfilter-summary-exec-spam), you can process spam mark
 ;; even in nntp.
-
-;; If you want to do spam checking after shimbun retrieve,
-;; do not use `mew-shimbun-retrieve-all' because it kills the shimbun buffer.
 
 ;;; Code:
 
