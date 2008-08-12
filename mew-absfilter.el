@@ -17,20 +17,14 @@
 ;; even in nntp.
 
 ;; If you want to do spam checking after shimbun retrieve,
-;; - Do not use `mew-shimbun-retrieve-all', because it kills the shimbun buffer
-;; - Set start-point like this:
-;; (defun mew-shimbun-retrieve-set-start-point ()
-;;   "Set retrieve start point."
-;;   (mew-sinfo-set-start-point (point-max)))
-;; (add-hook 'mew-shimbun-before-retrieve-hook
-;;           'mew-shimbun-retrieve-set-start-point)
+;; do not use `mew-shimbun-retrieve-all' because it kills the shimbun buffer.
 
 ;;; Code:
 
 (require 'mew)
 
 ;;; spam mark
-(defvar mew-absfilter-mark-spam ?\;)	;"s" in wl
+(defvar mew-absfilter-mark-spam ?\;)
 
 (defvar mew-absfilter-spam-folder "+spam"
   "*Spam folder. Must be a local folder.")
@@ -342,19 +336,10 @@ Save `mew-absfilter-spam-folder-max-msgs' messages."
 					 (mew-sinfo-get-start-point)
 					 (point-max))))))
 
-(add-hook 'mew-pop-sentinel-non-biff-hook
-	  'mew-absfilter-check-spam-after-retrieve)
-(add-hook 'mew-imap-sentinel-non-biff-hook
-	  'mew-absfilter-check-spam-after-retrieve)
-(add-hook 'mew-nntp-sentinel-hook
-	  'mew-absfilter-check-spam-after-retrieve)
-(add-hook 'mew-scan-sentinel-hook
-  	  'mew-absfilter-check-spam-after-retrieve)
-
 ;; mew-local-sentinel does not let-bind `directive'
 ;; and that information is lost by (mew-info-clean-up pnm)
 ;; when mew-scan-sentinel-hook is called.
-(defadvice mew-local-sentinel (around absfilter-check activate)
+(defadvice mew-local-sentinel (around absfilter-check disable)
   "Bind `directive' for spam checking.
 Advised in mew-absfilter.el"
   (let ((directive (mew-local-get-directive (process-name process))))
@@ -362,24 +347,25 @@ Advised in mew-absfilter.el"
 
 ;;; Check after `mew-shimbun-retrieve'
 
+(defun mew-absfilter-shimbun-retrieve-set-start-point ()
+  "Set retrieve start point."
+  (mew-sinfo-set-start-point (point-max)))
+
 (defun mew-absfilter-check-spam-after-shimbun-retrieve ()
   "Check spam messages with absfilter after shimbun-retrieve."
   (mew-absfilter-check-spam-region (mew-summary-folder-name 'ext)
 				   (mew-sinfo-get-start-point) (point-max)))
 
-(add-hook 'mew-shimbun-retrieve-hook
-	  'mew-absfilter-check-spam-after-shimbun-retrieve)
-
 
 ;; modeline
-(defadvice mew-summary-setup-mode-line (after absfilter-process activate)
+(defadvice mew-summary-setup-mode-line (after absfilter-process disable)
   "Display \"bsfilter\" in mode line.
 Advised in mew-absfilter.el"
   (add-to-list 'mode-line-process
 	       (list 'mew-absfilter-summary-buffer-process " bsfilter")))
 
 ;; inhibit pack, exec
-(defadvice mew-summary-exclusive-p (after bsfilter-process activate)
+(defadvice mew-summary-exclusive-p (after absfilter-process disable)
   "Return nil when operation may break marking spam.
 `mew-absfilter-apply-spam-action' may put spam mark on the wrong message
 if message number is changed during bsfilter is running.
@@ -393,7 +379,66 @@ Advised in mew-absfilter.el"
     (unless no-msg
       (message "bsfilter is running. Try again later"))
     (setq ad-return-value nil)))
+
+(defvar mew-absfilter-check t
+  "When to check with bsfilter.
+If t, do full check. Otherwise, the value should be a list whose element
+is one of `local', `pop', `imap', `nntp', or `shimbun'.")
 
+(defvar mew-absfilter-mode nil)
+;;;###autoload
+(defun mew-absfilter-mode (&optional arg)
+  "Enable or disable bsfilter checking.
+See `mew-absfilter-check' when bsfilter is run."
+  (interactive "P")
+  (let ((mode (if arg
+		  (> (prefix-numeric-value arg) 0)
+		(not mew-absfilter-mode))))
+    (setq mew-absfilter-mode mode)
+    (mew-absfilter-mode-activate (if mode mew-absfilter-check))
+    (when (interactive-p)
+      (message "bsfilter checking is %s" (if mode "enabled" "disabled")))))
+
+(defun mew-absfilter-mode-activate (initialize)
+  (let ((all '(local pop imap nntp shimbun))
+	ad-func hook-func)
+    (when (eq initialize t)
+      (setq initialize all))
+    (if initialize
+	(setq ad-func 'ad-enable-advice
+	      hook-func 'add-hook)
+      (setq initialize all
+	    ad-func 'ad-disable-advice
+	    hook-func 'remove-hook))
+    (when (memq 'local initialize)
+      (funcall ad-func 'mew-local-sentinel 'around 'absfilter-check)
+      (ad-activate 'mew-local-sentinel)
+      (funcall hook-func
+	       'mew-scan-sentinel-hook
+	       'mew-absfilter-check-spam-after-retrieve))
+    (when (memq 'pop initialize)
+      (funcall hook-func
+	       'mew-pop-sentinel-non-biff-hook
+	       'mew-absfilter-check-spam-after-retrieve))
+    (when (memq 'imap initialize)
+      (funcall hook-func
+	       'mew-imap-sentinel-non-biff-hook
+	       'mew-absfilter-check-spam-after-retrieve))
+    (when (memq 'nntp initialize)
+      (funcall hook-func
+	       'mew-nntp-sentinel-hook
+	       'mew-absfilter-check-spam-after-retrieve))
+    (when (memq 'shimbun initialize)
+      (funcall hook-func
+	       'mew-shimbun-before-retrieve-hook
+	       'mew-absfilter-shimbun-retrieve-set-start-point)
+      (funcall hook-func
+	       'mew-shimbun-retrieve-hook
+	       'mew-absfilter-check-spam-after-shimbun-retrieve))
+    (funcall ad-func 'mew-summary-setup-mode-line 'after 'absfilter-process)
+    (funcall ad-func 'mew-summary-exclusive-p 'after 'absfilter-process)
+    (ad-activate 'mew-summary-setup-mode-line)
+    (ad-activate 'mew-summary-exclusive-p)))
 
 (provide 'mew-absfilter)
 
