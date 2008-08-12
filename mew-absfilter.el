@@ -124,6 +124,7 @@
   (interactive)
   (mew-summary-msg-or-part
    (mew-summary-goto-message)
+   (mew-decode-syntax-delete)
    (when (mew-sumsyn-match mew-regex-sumsyn-short)
      (let* ((msg (mew-sumsyn-message-number))
 	    (case:folder (mew-sumsyn-folder-name))
