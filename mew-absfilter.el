@@ -259,7 +259,6 @@
      (mew-absfilter-add-clean FILES)
      (message "Learning as clean...done"))))
    
-
 (defun mew-absfilter-mark-learn-spam (&optional mark-only)
   "Learn all messages marked with '*' as spam."
   (interactive "P")
