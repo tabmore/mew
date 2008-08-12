@@ -25,6 +25,7 @@
 (defvar mew-bsfilter-spam-folder "+spam")
 (defvar mew-bsfilter-spam-action `(("^\\+spam$" ,mew-mark-review)
 				   (t ,mew-bsfilter-spam-folder)))
+(defvar mew-bsfilter-max-msgs 10000)
 
 (defvar mew-bsfilter-map nil)
 
@@ -155,6 +156,7 @@
   (mew-summary-or-thread
    (save-excursion
      (let ((msglist nil))
+       (goto-char begin)
        (while (< (point) end)
 	 (when (and (mew-summary-markable)
 		    (mew-sumsyn-match mew-regex-sumsyn-short))
@@ -163,22 +165,27 @@
        (nreverse msglist)))))
 
 (defun mew-bsfilter-check-spam-region (case:folder begin end)
-  (with-current-buffer case:folder
-    (let ((buf (get-buffer-create (generate-new-buffer-name " *mew bsfilter*")))
-	  (msglist (mew-bsfilter-collect-message-region begin end))
-	  process)
-      (when msglist
-	(message "Spam checking...")
+  (let ((msglist (with-current-buffer case:folder
+		   (mew-bsfilter-collect-message-region begin end)))
+	nxt)
+    (message "Spam checking...")
+    (while msglist
+      (let ((buf (get-buffer-create
+		  (generate-new-buffer-name " *mew bsfilter*")))
+	    process)
 	(with-current-buffer buf
 	  (cd (mew-expand-folder case:folder))
 	  (mew-erase-buffer)
-	  (set (make-local-variable 'mew-bsfilter-process-folder) case:folder)
-	  (setq process (apply 'start-process "mew-bsfilter"
-			       (current-buffer)
-			       mew-bsfilter-program
-			       (append mew-bsfilter-arg-check msglist))))
+	  (set (make-local-variable 'mew-bsfilter-process-folder) case:folder))
+	(setq nxt (nthcdr mew-bsfilter-max-msgs msglist))
+	(when nxt
+	  (setcdr (nthcdr (1- mew-bsfilter-max-msgs) msglist) nil))
+	(setq process (apply 'start-process "mew-bsfilter" buf
+			     mew-bsfilter-program
+			     (append mew-bsfilter-arg-check msglist)))
 	(set-process-sentinel process 'mew-bsfilter-sentinel)
-	(add-to-list 'mew-summary-buffer-bsfilter-process process)))))
+	(add-to-list 'mew-summary-buffer-bsfilter-process process))
+      (setq msglist nxt))))
 
 (defun mew-bsfilter-apply-spam-action (case:folder spam)
   (let* ((vfolder (mew-folder-to-thread case:folder))
@@ -202,8 +209,7 @@
     (let (spam)
       (goto-char (point-min))
       (when (looking-at "Can't exec program: ")
-	;;xxx
-	(error "Probably, argument is too long. %s"
+	(error "bsfilter error. %s"
 	       (mew-buffer-substring (point) (line-end-position))))
       (while (not (eobp))
 	(setq spam (cons (mew-buffer-substring (point) (line-end-position))
