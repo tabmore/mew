@@ -154,7 +154,8 @@
   "This function returns a list of message number."
   (mew-summary-or-thread
    (save-excursion
-     (let ((regex (mew-mark-regex ? ))
+     (let ((regex "^[ U]")		;xxx (mew-mark-regex ?U ? ) is ideal ?
+;;	   (regex (mew-mark-regex ? ))
 	   (msglist nil))
        (goto-char begin)
        (while (re-search-forward regex end t)
