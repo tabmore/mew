@@ -10,7 +10,7 @@
 
 ;; http://bsfilter.org/
 
-;; ** Don't "O" (mew-summary-pack) or 'refile + inc' during spam cheking **
+;; ** Don't "O" (mew-summary-pack) or 'refile + inc' during spam checking **
 
 ;;; Code:
 
@@ -170,7 +170,8 @@
   (let ((msglist (with-current-buffer case:folder
 		   (mew-bsfilter-collect-message-region begin end)))
 	nxt)
-    (message "Spam checking...")
+    (when msglist
+      (message "Spam checking..."))
     (while msglist
       (let ((buf (get-buffer-create
 		  (generate-new-buffer-name " *mew bsfilter*")))
