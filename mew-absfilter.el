@@ -36,7 +36,8 @@
 ;;; spam mark
 (defvar mew-absfilter-mark-spam ?\;)	;"s" in wl
 
-(defvar mew-absfilter-spam-folder "+spam")
+(defvar mew-absfilter-spam-folder "+spam"
+  "*Spam folder. Must be a local folder.")
 
 (defface mew-absfilter-face-mark-spam
   '((((class color) (type tty)) (:foreground "green"))
