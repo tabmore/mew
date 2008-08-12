@@ -211,7 +211,7 @@
      (message "Spam checking...%s"
 	      (cond
 	       ((= status 0)
-		(format "done (%d spam found in %s)" (length spam) case:folder))
+		(format "done (%d spam in %s)" (length spam) case:folder))
 	       ((= status 1)
 		(concat "done (spam not found in " case:folder ")"))
 	       (t
