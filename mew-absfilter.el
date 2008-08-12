@@ -153,7 +153,7 @@
 ;; check
 (defun mew-bsfilter-collect-message-region (begin end)
   "This function returns a list of message number."
-  (mew-summary-or-thread
+  (mew-pickable
    (save-excursion
      (let ((msglist nil))
        (goto-char begin)
@@ -230,7 +230,7 @@
 (defun mew-bsfilter-check-spam (&optional arg)
   "Check spam messages with bsfilter."
   (interactive "P")
-  (mew-summary-or-thread
+  (mew-pickable
    (let ((region (if arg
 		     (mew-summary-get-region)
 		   (cons (point-min) (point-max)))))
