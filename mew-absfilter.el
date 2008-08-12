@@ -6,6 +6,9 @@
 ;; You can use, copy, distribute, and/or modify this file for any purpose.
 ;; There is NO WARRANTY.
 
+;;; ChangeLog:
+;;  1.38 Masayuki Ataka <masayuki.ataka@gmail.com> for Mew 5
+
 ;;; Commentary:
 
 ;; You can find bsfilter at http://bsfilter.org/
@@ -224,7 +227,7 @@
    (when (mew-sumsyn-match mew-regex-sumsyn-short)
      (let* ((msg (mew-sumsyn-message-number))
 	    (case:folder (mew-sumsyn-folder-name))
-	    (file (mew-expand-folder case:folder msg)))
+	    (file (mew-absfilter-expand-msg case:folder msg)))
        (when (eq (mew-summary-get-mark) mew-absfilter-mark-spam)
 	 (mew-summary-undo))
        (unless mark-only
@@ -239,11 +242,19 @@
    (when (mew-sumsyn-match mew-regex-sumsyn-short)
      (let* ((msg (mew-sumsyn-message-number))
 	    (case:folder (mew-sumsyn-folder-name))
-	    (file (mew-expand-folder case:folder msg)))
+	    (file (mew-absfilter-expand-msg case:folder msg)))
        (mew-absfilter-summary-spam-one)
        (unless mark-only
 	 (mew-absfilter-add-spam (list file))
 	 (message "Learned as spam"))))))
+
+(defun mew-absfilter-expand-msg (folder msg)
+  "Expand message MSG in FOLDER.
+Function `mew-expand-msg' is defined after Mew 4.2.53.
+Use `mew-expand-folder' iff `mew-expand-msg' is not available."
+  (if (fboundp 'mew-expand-msg)
+      (mew-expand-msg folder msg)
+    (mew-expand-folder folder msg)))
 
 (defun mew-absfilter-mark-learn-clean (&optional mark-only)
   "Learn all messages marked with '*' as clean (not spam)."
