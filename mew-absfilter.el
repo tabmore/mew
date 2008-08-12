@@ -8,7 +8,7 @@
 
 ;;; Commentary:
 
-;; http://www.h2.dion.ne.jp/~nabeken/bsfilter/
+;; http://bsfilter.org/
 
 ;; ** Don't "O" (mew-summary-pack) or 'refile + inc' during spam cheking **
 
@@ -17,10 +17,11 @@
 (require 'mew)
 
 (defvar mew-bsfilter-program "bsfilter")
-(defvar mew-bsfilter-arg-check '("--auto-update"))
+(defvar mew-bsfilter-arg-check '("--quiet" "--list-spam"
+				 ;; "--asynchronous-auto-update"
+				 ))
 (defvar mew-bsfilter-arg-clean '("--sub-spam" "--add-clean" "--update"))
 (defvar mew-bsfilter-arg-spam '("--sub-clean" "--add-spam" "--update"))
-(defvar mew-bsfilter-spam-cutoff 0.95)
 (defvar mew-bsfilter-spam-folder "+spam")
 (defvar mew-bsfilter-spam-action `(("^\\+spam$" ,mew-mark-review)
 				   (t ,mew-bsfilter-spam-folder)))
@@ -56,7 +57,6 @@
   (let ((action (catch 'found
 		  (dolist (act mew-bsfilter-spam-action)
 		    (when (or (eq (car act) t)
-			      ;; use (mew-case:folder-folder folder) ?
 			      (string-match (car act) case:folder))
 		      (throw 'found (cadr act)))))))
     (when (stringp action)
@@ -65,7 +65,7 @@
 			   (mapcar
 			    (lambda (fld)
 			      (let ((p (mew-folder-prefix
-					(mew-folder-folder fld))))
+					(mew-case:folder-folder fld))))
 				(when (and (not (mew-folder-nntpp p))
 					   (not (mew-folder-popp p))
 					   (string= prefix p))
@@ -202,15 +202,14 @@
 
 (defun mew-bsfilter-collect-spam-message (case:folder)
   (save-excursion
-    (let ((regexp (format " %s/\\([^ ]+\\) [^ ]+ \\(.+\\)$"
+    (let ((regexp (format "^%s/\\(.+\\)$"
 			  (regexp-quote (mew-expand-folder case:folder))))
 	  spam)
       (goto-char (point-min))
-      (while (re-search-forward regexp nil t)
-	(let ((msg (mew-match-string 1))
-	      (score (string-to-number (mew-match-string 2))))
-	  (when (> score mew-bsfilter-spam-cutoff)
-	    (setq spam (cons msg spam)))))
+      (while (not (eobp))
+	(when (looking-at regexp)
+	  (setq spam (cons (mew-match-string 1) spam)))
+	(forward-line))
       (nreverse spam))))
 
 (defun mew-bsfilter-sentinel (process event)
@@ -249,7 +248,7 @@
   "Check spam messages with bsfilter after retrieve."
   ;; bnm and directive is local variable which can be used in
   ;; mew-{local,pop,imap,nntp}-sentinel.
-  (let* ((proto (mew-folder-prefix (mew-folder-folder bnm)))
+  (let* ((proto (mew-folder-prefix (mew-case:folder-folder bnm)))
 	 (check (cdr (assoc proto mew-bsfilter-check-directive-list))))
     (when (memq directive check)
       (mew-bsfilter-check-spam-region bnm
