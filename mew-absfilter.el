@@ -17,6 +17,9 @@
 (require 'mew)
 
 (defvar mew-bsfilter-program "bsfilter")
+(defvar mew-bsfilter-arg-check '("--auto-update"))
+(defvar mew-bsfilter-arg-clean '("--sub-spam" "--add-clean" "--update"))
+(defvar mew-bsfilter-arg-spam '("--sub-clean" "--add-spam" "--update"))
 (defvar mew-bsfilter-spam-cutoff 0.95)
 (defvar mew-bsfilter-spam-folder "+spam")
 (defvar mew-bsfilter-spam-action `(("^\\+spam$" ,mew-mark-review)
@@ -59,8 +62,9 @@
 	   (fld (mew-sumsyn-folder-name))
 	   (path (mew-expand-folder fld msg)))
       (setq wait (if wait nil 0))
-      (call-process mew-bsfilter-program nil wait nil
-		    "--sub-spam" "--add-clean" "--update" path)
+      (apply 'call-process
+	     mew-bsfilter-program nil wait nil
+	     (append mew-bsfilter-arg-clean (list path)))
       (mew-bsfilter-undo-action (mew-bsfilter-folder-action fld)))
     (unless no-msg
       (message "Marked as clean"))))
@@ -73,8 +77,9 @@
 	   (fld (mew-sumsyn-folder-name))
 	   (path (mew-expand-folder fld msg)))
       (setq wait (if wait nil 0))
-      (call-process mew-bsfilter-program nil wait nil
-		    "--sub-clean" "--add-spam" "--update" path)
+      (apply 'call-process
+	     mew-bsfilter-program nil wait nil
+	     (append mew-bsfilter-arg-spam (list path)))
       (mew-bsfilter-do-action (mew-bsfilter-folder-action fld)))
     (unless no-msg
       (message "Marked as spam"))))
@@ -173,7 +178,7 @@
 	(setq process (apply 'start-process "mew-bsfilter"
 			     (current-buffer)
 			     mew-bsfilter-program
-			     msglist))
+			     (append mew-bsfilter-arg-check msglist)))
 	(set-process-sentinel process 'mew-bsfilter-sentinel)
 	(add-to-list 'mew-summary-buffer-bsfilter-process process)))))
 
