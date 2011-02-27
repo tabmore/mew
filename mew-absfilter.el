@@ -141,17 +141,18 @@ Use `mew-expand-folder' iff `mew-expand-msg' is not available."
 ;; spam check
 (defun mew-absfilter-collect-message-region (begin end)
   "Returns a list of message file name in region."
-  (let (msgs)
-    (save-excursion
-      (save-restriction
-	(narrow-to-region begin end)
-	(goto-char (point-min))
-	(while (not (eobp))
-	  (when (and (mew-summary-markable)
-		     (mew-sumsyn-match mew-regex-sumsyn-short))
-	    (push (mew-absfilter-sumsyn-filename) msgs))
-	  (forward-line))))
-    (nreverse msgs)))
+  (when (> end begin)
+    (let (msgs)
+      (save-excursion
+	(save-restriction
+	  (narrow-to-region begin end)
+	  (goto-char (point-min))
+	  (while (not (eobp))
+	    (when (and (mew-summary-markable)
+		       (mew-sumsyn-match mew-regex-sumsyn-short))
+	      (push (mew-absfilter-sumsyn-filename) msgs))
+	    (forward-line))))
+      (nreverse msgs))))
 
 (defun mew-absfilter-collect-spam-message ()
   (let (spam)
@@ -322,7 +323,7 @@ Use `mew-expand-folder' iff `mew-expand-msg' is not available."
   (let ((region (if (or arg (mew-mark-active-p))
 		    (mew-summary-get-region)
 		  (cons (point-min) (point-max)))))
-    (mew-absfilter-check-spam-region (mew-summary-folder-name)
+    (mew-absfilter-check-spam-region (mew-summary-folder-name 'ext)
 				     (car region) (cdr region))))
 
 (defun mew-absfilter-clean-spam-folder (&optional unlink)
@@ -365,9 +366,10 @@ is one of `local', `pop', `imap', `nntp', or `shimbun'.")
     (let* ((proto (mew-folder-prefix (mew-case:folder-folder bnm)))
 	   (check (cdr (assoc proto mew-absfilter-check-directive-list))))
       (when (memq directive check)
-	(mew-absfilter-check-spam-region bnm
-					 (mew-sinfo-get-start-point)
-					 (point-max))))))
+	(with-current-buffer bnm
+	  (mew-absfilter-check-spam-region bnm
+					   (mew-sinfo-get-start-point)
+					   (point-max)))))))
 
 ;; mew-local-sentinel does not let-bind `directive'
 ;; and that information is lost by (mew-info-clean-up pnm)
